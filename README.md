@@ -31,7 +31,6 @@ The goal is to understand Spark from a production engineer's perspective by expl
 ## 📂 Repository Structure
 
 ```text
-00-start-here/
 01-spark-core/
 02-spark-architecture/
 03-memory-management/
