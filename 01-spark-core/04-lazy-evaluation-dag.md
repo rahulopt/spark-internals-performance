@@ -1,0 +1,294 @@
+# Lazy Evaluation and Directed Acyclic Graph (DAG)
+
+## Introduction
+
+One of the most powerful features of Apache Spark is **Lazy Evaluation**. Instead of executing every operation immediately, Spark waits until an **Action** is called. During this time, Spark records all the transformations and builds a **Directed Acyclic Graph (DAG)**. Once an Action is triggered, Spark optimizes the DAG and executes the computation efficiently.
+
+Lazy Evaluation helps Spark reduce unnecessary computations, optimize execution plans, and improve overall performance.
+
+---
+
+# What is Lazy Evaluation?
+
+Lazy Evaluation is Spark's execution strategy where **Transformations are not executed immediately**.
+
+Instead of performing each operation as soon as it is written, Spark records the transformations and waits until an Action is called.
+
+For example:
+
+```python
+orders = spark.read.csv("orders.csv", header=True)
+
+filtered = orders.filter("quantity > 2")
+
+selected = filtered.select("customer_id", "quantity")
+```
+
+At this point:
+
+- No data has been processed.
+- No Job has been created.
+- No Task has been executed.
+- Spark is simply building an execution plan.
+
+Execution begins only when an Action is called.
+
+```python
+selected.show()
+```
+
+---
+
+# Why Does Spark Use Lazy Evaluation?
+
+Lazy Evaluation allows Spark to:
+
+- Optimize the execution plan.
+- Eliminate unnecessary operations.
+- Reduce disk I/O.
+- Minimize data movement (Shuffle).
+- Combine multiple transformations into a single execution plan.
+- Improve overall application performance.
+
+Instead of executing every transformation individually, Spark executes the optimized plan only once.
+
+---
+
+# What is a DAG?
+
+A **DAG (Directed Acyclic Graph)** is a graph that represents all the transformations in a Spark application.
+
+- **Directed** means every operation has a direction (from one transformation to the next).
+- **Acyclic** means there are no loops or cycles.
+- **Graph** represents the dependency between transformations.
+
+The DAG is created by the Driver Program before execution begins.
+
+---
+
+# Building a DAG
+
+Consider the following code:
+
+```python
+orders = spark.read.csv("orders.csv", header=True)
+
+filtered = orders.filter("quantity > 2")
+
+selected = filtered.select("customer_id", "quantity")
+
+selected.show()
+```
+
+Before `show()` is called, Spark builds the following DAG:
+
+```
+Read CSV
+    │
+    ▼
+ Filter
+    │
+    ▼
+ Select
+```
+
+No execution has happened yet.
+
+When `show()` is executed, Spark uses this DAG to create Jobs, Stages, and Tasks.
+
+---
+
+# DAG Execution Flow
+
+```
+User Code
+     │
+     ▼
+Transformations
+     │
+     ▼
+Build DAG
+     │
+     ▼
+Action
+     │
+     ▼
+Catalyst Optimizer
+     │
+     ▼
+Physical Execution Plan
+     │
+     ▼
+Job
+     │
+     ▼
+Stages
+     │
+     ▼
+Tasks
+     │
+     ▼
+Executors
+```
+
+---
+
+# Example
+
+```python
+orders = spark.read.csv("orders.csv", header=True)
+
+result = (
+    orders
+    .filter("quantity > 2")
+    .select("customer_id", "quantity")
+    .orderBy("customer_id")
+)
+
+result.show()
+```
+
+Spark records the transformations:
+
+```
+Read CSV
+      │
+      ▼
+Filter
+      │
+      ▼
+Select
+      │
+      ▼
+Order By
+```
+
+Nothing is executed until:
+
+```python
+result.show()
+```
+
+Only then does Spark execute the optimized plan.
+
+---
+
+# DAG Optimization
+
+Suppose we write:
+
+```python
+orders.filter("quantity > 2") \
+      .select("customer_id") \
+      .show()
+```
+
+Spark does **not** execute:
+
+```
+Read
+↓
+
+Filter
+
+↓
+
+Select
+
+↓
+
+Show
+```
+
+one step at a time.
+
+Instead, it analyzes the complete DAG and creates an optimized execution plan.
+
+This optimization is performed by the **Catalyst Optimizer**.
+
+Some common optimizations include:
+
+- Predicate Pushdown
+- Column Pruning
+- Constant Folding
+- Filter Reordering
+- Projection Pushdown
+
+These optimizations reduce the amount of data processed and improve execution speed.
+
+---
+
+# Lazy Evaluation vs Eager Evaluation
+
+| Lazy Evaluation | Eager Evaluation |
+|-----------------|------------------|
+| Execution is delayed until an Action is called. | Execution happens immediately after each operation. |
+| Used by Apache Spark. | Common in Python lists and Pandas. |
+| Allows query optimization. | No global optimization. |
+| Better for large distributed datasets. | Suitable for smaller in-memory datasets. |
+
+---
+
+# Viewing the DAG
+
+Spark provides two ways to understand the execution plan.
+
+## 1. Spark UI
+
+Open:
+
+```
+http://localhost:4040
+```
+
+Navigate to:
+
+```
+Jobs → DAG Visualization
+```
+
+The DAG Visualization displays:
+
+- Jobs
+- Stages
+- Dependencies
+- Shuffle boundaries
+
+---
+
+## 2. explain()
+
+You can also inspect the execution plan using:
+
+```python
+result.explain()
+```
+
+or
+
+```python
+result.explain("formatted")
+```
+
+This displays the logical and physical execution plans generated by Spark.
+
+---
+
+# Benefits of Lazy Evaluation
+
+- Improves application performance.
+- Reduces unnecessary computations.
+- Minimizes data movement across the cluster.
+- Optimizes execution before processing begins.
+- Enables Spark to execute complex workflows efficiently.
+
+---
+
+# Key Takeaways
+
+- Spark uses **Lazy Evaluation** to delay execution until an Action is called.
+- Transformations build a **Directed Acyclic Graph (DAG)** instead of executing immediately.
+- The Driver Program creates the DAG and uses it to plan execution.
+- The **Catalyst Optimizer** analyzes and optimizes the DAG before execution.
+- After optimization, Spark creates Jobs, Stages, and Tasks, which are executed by Executors in parallel.
+- Lazy Evaluation is one of the primary reasons Spark achieves high performance on large-scale data processing.
